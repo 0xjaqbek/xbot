@@ -754,17 +754,49 @@
                     }
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Failed to load tweets: ${response.status}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('✅ Data received:', data);
+                    
+                    if (data.data && data.data.length > 0) {
+                        tweetsContainer.innerHTML = data.data.map(tweet => `
+                            <div class="post-item" onclick="selectTweet('${tweet.id}', this)">
+                                <div class="post-content">${tweet.text}</div>
+                                <div class="post-meta">
+                                    <span>📅 ${new Date(tweet.created_at).toLocaleString()}</span>
+                                    <span>❤️ ${tweet.public_metrics?.like_count || 0}</span>
+                                    <span>🔄 ${tweet.public_metrics?.retweet_count || 0}</span>
+                                    <span>💬 ${tweet.public_metrics?.reply_count || 0}</span>
+                                </div>
+                            </div>
+                        `).join('');
+                        console.log('✅ Tweets displayed successfully!');
+                        showSuccess('Tweets loaded successfully!');
+                    } else {
+                        tweetsContainer.innerHTML = '<p>No tweets found.</p>';
+                    }
+                } else if (response.status === 429) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.log('⏰ Rate limit hit again');
+                    tweetsContainer.innerHTML = `
+                        <div style="padding: 20px; text-align: center; background: #fff3cd; border-radius: 10px;">
+                            <h3 style="color: #856404;">⏰ Rate Limit Active</h3>
+                            <p style="color: #856404;">Wait a few minutes and try again.</p>
+                            <button onclick="loadMyTweets()" style="background: #ffc107; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;">
+                                🔄 Try Again
+                            </button>
+                        </div>
+                    `;
+                    showError('Rate limit active - please wait a few minutes');
+                } else {
+                    const errorText = await response.text();
+                    console.error('❌ API error:', errorText);
+                    throw new Error(`API failed: ${response.status}`);
                 }
-
-                const tweetsData = await response.json();
-                displayTweets(tweetsData.data || []);
-
             } catch (error) {
-                console.error('Error loading tweets:', error);
-                showError('Failed to load tweets');
-                document.getElementById('tweetsContainer').innerHTML = '<p class="error">Failed to load tweets</p>';
+                console.error('❌ Fetch error:', error);
+                showError('Failed to load tweets: ' + error.message);
+                tweetsContainer.innerHTML = '<p class="error">Failed to load tweets</p>';
             }
         }
 
