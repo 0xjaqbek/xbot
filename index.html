@@ -385,14 +385,16 @@
     <script>
         // Configuration
         const CLIENT_ID = 'cGVLOGZSRERpNVhwM0JlUmxJaTE6MTpjaQ';
+        const CLIENT_SECRET = 'A5FzUCko_Snr9NDOrn-nskwVgX_9aGDtFIZO_OR5czwL9SsySp'; 
         const REDIRECT_URI = window.location.origin + window.location.pathname;
         const USE_VERCEL_FUNCTION = true; // Set to true if you deploy to Vercel
-        const VERCEL_FUNCTION_URL = '/api/twitter-token'; // Your Vercel function URL
+        const VERCEL_FUNCTION_URL = '/api/twitter-token'; // Your Vercel function URL (corrected path)
         
         // Debug info
         console.log('🔗 Current URL:', window.location.href);
         console.log('🔗 Redirect URI:', REDIRECT_URI);
         console.log('🔑 Client ID:', CLIENT_ID);
+        console.log('🔐 Client Secret:', CLIENT_SECRET ? 'Set' : 'Not set');
         console.log('⚡ Use Vercel Function:', USE_VERCEL_FUNCTION);
         const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
@@ -611,17 +613,27 @@
                 
             console.log('📡 Calling Vercel function:', functionUrl);
             
+            const requestBody = {
+                code: code,
+                codeVerifier: codeVerifier,
+                clientId: CLIENT_ID,
+                redirectUri: REDIRECT_URI
+            };
+
+            // Add client secret if available (for confidential clients)
+            if (CLIENT_SECRET && CLIENT_SECRET !== 'YOUR_TWITTER_CLIENT_SECRET') {
+                requestBody.clientSecret = CLIENT_SECRET;
+                console.log('🔐 Using confidential client mode');
+            } else {
+                console.log('🔓 Using public client mode (PKCE only)');
+            }
+            
             const response = await fetch(functionUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    code: code,
-                    codeVerifier: codeVerifier,
-                    clientId: CLIENT_ID,
-                    redirectUri: REDIRECT_URI
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -1022,30 +1034,38 @@ ${redirectUri}
    - Go to your app settings
    - Click "App permissions" → Set to "Read and write"
    - Click "Keys and tokens"
-   - Find "OAuth 2.0 Client ID" section
-   - Copy your Client ID
+   - Find "OAuth 2.0 Client ID and Client Secret" section
+   - Copy your Client ID AND Client Secret
 
-4️⃣ Set Redirect URI:
+4️⃣ Configure App Type:
+   - In app settings, find "App info"
+   - Set "App type" to "Confidential" (recommended)
+   - OR set to "Public" if you prefer PKCE-only
+
+5️⃣ Set Redirect URI:
    - Still in app settings
    - Click "App settings" 
    - Scroll to "Callback / Redirect URIs"
    - Add EXACTLY: ${redirectUri}
    - Save changes
 
-5️⃣ Update this code:
+6️⃣ Update this code:
    - Replace 'YOUR_TWITTER_CLIENT_ID' with your actual Client ID
-   - Redeploy to GitHub Pages
+   - Replace 'YOUR_TWITTER_CLIENT_SECRET' with your actual Client Secret
+   - Redeploy to Vercel
 
 ❌ COMMON MISTAKES:
 - Redirect URI doesn't match exactly (case-sensitive!)
 - App permissions not set to "Read and write"
-- Using wrong Client ID (use OAuth 2.0, not API key)
+- Using wrong Client ID/Secret (use OAuth 2.0, not API key)
+- App type doesn't match authentication method
 - Forgetting the trailing slash in redirect URI
 
 🔍 DEBUGGING:
 - Check browser console for error messages
 - Make sure redirect URI in Twitter app matches exactly: ${redirectUri}
-- Ensure OAuth 2.0 is enabled (not OAuth 1.0a)`;
+- Ensure OAuth 2.0 is enabled (not OAuth 1.0a)
+- For 401 errors: Check app type (Confidential vs Public)`;
 
             console.log(instructions);
             
