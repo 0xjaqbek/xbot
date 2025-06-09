@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   try {
     console.log('🔄 Starting token exchange...');
     
-    const { code, codeVerifier, clientId, redirectUri } = req.body;
+    const { code, codeVerifier, clientId, redirectUri, clientSecret } = req.body;
 
     // Validate required parameters
     if (!code || !codeVerifier || !clientId || !redirectUri) {
@@ -28,7 +28,8 @@ export default async function handler(req, res) {
         code: !!code, 
         codeVerifier: !!codeVerifier, 
         clientId: !!clientId, 
-        redirectUri: !!redirectUri 
+        redirectUri: !!redirectUri,
+        clientSecret: !!clientSecret
       });
       return res.status(400).json({ 
         error: 'Missing required parameters',
@@ -37,7 +38,8 @@ export default async function handler(req, res) {
           code: !!code,
           codeVerifier: !!codeVerifier,
           clientId: !!clientId,
-          redirectUri: !!redirectUri
+          redirectUri: !!redirectUri,
+          clientSecret: !!clientSecret
         }
       });
     }
@@ -47,7 +49,8 @@ export default async function handler(req, res) {
       codeLength: code.length,
       codeVerifierLength: codeVerifier.length,
       clientIdLength: clientId.length,
-      redirectUri
+      redirectUri,
+      hasClientSecret: !!clientSecret
     });
 
     // Prepare the token exchange request
@@ -59,14 +62,26 @@ export default async function handler(req, res) {
       code_verifier: codeVerifier
     });
 
+    // Prepare headers
+    const headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+
+    // Add authorization header if client secret is provided (confidential client)
+    if (clientSecret) {
+      const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+      headers['Authorization'] = `Basic ${credentials}`;
+      console.log('🔐 Using confidential client authentication');
+    } else {
+      console.log('🔓 Using public client authentication (PKCE only)');
+    }
+
     console.log('🚀 Calling Twitter token endpoint...');
 
     // Exchange code for access token
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: headers,
       body: tokenRequestBody
     });
 
@@ -79,7 +94,10 @@ export default async function handler(req, res) {
         error: 'Token exchange failed',
         twitterError: responseText,
         status: tokenResponse.status,
-        details: 'Check if your OAuth app settings are correct'
+        details: 'Check if your OAuth app settings are correct. Make sure app type matches authentication method.',
+        suggestion: clientSecret ? 
+          'Using confidential client - make sure app is set to "Confidential" in Twitter settings' :
+          'Using public client - make sure app is set to "Public" in Twitter settings and PKCE is enabled'
       });
     }
 
