@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitter Bot - GitHub Pages</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #1da1f2 0%, #0d8bd9 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #1da1f2, #0d8bd9);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .auth-section {
+            padding: 40px;
+            text-align: center;
+            background: #f8f9fa;
+        }
+
+        .login-btn {
+            background: #1da1f2;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .login-btn:hover {
+            background: #0d8bd9;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(29, 161, 242, 0.3);
+        }
+
+        .main-content {
+            display: none;
+            grid-template-columns: 350px 1fr;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            padding: 30px;
+            border-right: 1px solid #e9ecef;
+        }
+
+        .content-area {
+            padding: 30px;
+        }
+
+        .user-info {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .user-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin-bottom: 15px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 15px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .section h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        input, textarea, button, select {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #1da1f2;
+        }
+
+        button {
+            background: #1da1f2;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #0d8bd9;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .post-item, .comment-item {
+            padding: 20px;
+            margin: 15px 0;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .post-item:hover, .comment-item:hover {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            transform: translateY(-3px);
+        }
+
+        .post-item.selected, .comment-item.selected {
+            border-color: #1da1f2;
+            background: #e3f2fd;
+        }
+
+        .post-meta, .comment-meta {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .response-area {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .response-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .response-buttons button {
+            flex: 1;
+        }
+
+        .retry-btn {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .retry-btn:hover {
+            background: #e0a800;
+        }
+
+        .publish-btn {
+            background: #28a745;
+        }
+
+        .publish-btn:hover {
+            background: #218838;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            padding: 8px 16px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1da1f2;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐦 Twitter Bot Assistant</h1>
+            <p>AI-powered comment responses for your Twitter account</p>
+        </div>
+
+        <!-- Authentication Section -->
+        <div id="authSection" class="auth-section">
+            <h2>Connect Your Twitter Account</h2>
+            <p style="margin: 20px 0; color: #666;">
+                This tool helps you generate AI responses to comments on your tweets.<br>
+                Your data is processed locally - no information is stored on servers.
+            </p>
+            <button id="loginBtn" class="login-btn" onclick="startTwitterAuth()">
+                🔐 Login with Twitter
+            </button>
+            <div style="margin-top: 30px;">
+                <h3>🔑 AI Configuration</h3>
+                <input type="text" id="deepseekApiKey" placeholder="Enter your Deepseek API Key" style="max-width: 400px;" />
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                    Get your free API key at <a href="https://platform.deepseek.com/" target="_blank">platform.deepseek.com</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Main Application -->
+        <div id="mainContent" class="main-content">
+            <div class="sidebar">
+                <!-- User Info -->
+                <div id="userInfo" class="user-info">
+                    <img id="userAvatar" src="" alt="User Avatar" class="user-avatar" />
+                    <h3 id="userName">Loading...</h3>
+                    <p id="userHandle">@loading</p>
+                    <div class="stats">
+                        <div class="stat">
+                            <div id="followersCount" class="stat-number">-</div>
+                            <div class="stat-label">Followers</div>
+                        </div>
+                        <div class="stat">
+                            <div id="followingCount" class="stat-number">-</div>
+                            <div class="stat-label">Following</div>
+                        </div>
+                        <div class="stat">
+                            <div id="tweetsCount" class="stat-number">-</div>
+                            <div class="stat-label">Tweets</div>
+                        </div>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+
+                <!-- AI Settings -->
+                <div class="section">
+                    <h3>🤖 AI Response Settings</h3>
+                    <textarea id="responseInstructions" rows="4" placeholder="AI instructions...">You are a helpful and engaging social media assistant. Respond to comments in a friendly, professional manner that adds value to the conversation. Keep responses under 280 characters and maintain a positive tone.</textarea>
+                    <select id="responseStyle">
+                        <option value="professional">Professional</option>
+                        <option value="casual">Casual & Friendly</option>
+                        <option value="helpful">Helpful & Informative</option>
+                        <option value="engaging">Engaging & Questions</option>
+                    </select>
+                </div>
+
+                <!-- Actions -->
+                <div class="section">
+                    <h3>📊 Actions</h3>
+                    <button onclick="loadMyTweets()">🔄 Refresh My Tweets</button>
+                    <button onclick="showAnalytics()">📈 View Analytics</button>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <!-- My Tweets -->
+                <div id="tweetsSection">
+                    <h2>📝 Your Recent Tweets</h2>
+                    <div id="tweetsContainer">
+                        <p class="loading">Loading your tweets...</p>
+                    </div>
+                </div>
+
+                <!-- Comments Section -->
+                <div id="commentsSection" style="display: none;">
+                    <h2>💬 Comments & Replies</h2>
+                    <div id="commentsContainer"></div>
+                </div>
+
+                <!-- Response Generation -->
+                <div id="responseSection" style="display: none;">
+                    <h2>🎯 AI Generated Response</h2>
+                    <div class="response-area">
+                        <textarea id="generatedResponse" rows="4" placeholder="Generated response will appear here..."></textarea>
+                        <div class="response-buttons">
+                            <button class="retry-btn" onclick="generateResponse()">🔄 Regenerate</button>
+                            <button class="publish-btn" onclick="publishReply()">📤 Post Reply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CLIENT_ID = 'YOUR_TWITTER_CLIENT_ID'; // You'll need to set this
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+        const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+
+        // Global variables
+        let accessToken = '';
+        let deepseekApiKey = '';
+        let currentUser = null;
+        let selectedTweet = null;
+        let selectedComment = null;
+
+        // Check if user is returning from Twitter OAuth
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+
+            if (code && state) {
+                handleOAuthCallback(code, state);
+            } else {
+                // Check if user was previously authenticated
+                accessToken = localStorage.getItem('twitter_access_token');
+                if (accessToken) {
+                    showMainApp();
+                    loadUserInfo();
+                }
+            }
+
+            // Load saved API key
+            deepseekApiKey = localStorage.getItem('deepseek_api_key') || '';
+            if (deepseekApiKey) {
+                document.getElementById('deepseekApiKey').value = deepseekApiKey;
+            }
+        });
+
+        // Generate random string for OAuth state
+        function generateRandomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        // Generate code challenge for PKCE
+        async function generateCodeChallenge(codeVerifier) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(codeVerifier);
+            const digest = await window.crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(digest)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+        }
+
+        // Start Twitter OAuth flow
+        async function startTwitterAuth() {
+            // Save Deepseek API key
+            const apiKey = document.getElementById('deepseekApiKey').value.trim();
+            if (!apiKey) {
+                showError('Please enter your Deepseek API key first');
+                return;
+            }
+            deepseekApiKey = apiKey;
+            localStorage.setItem('deepseek_api_key', deepseekApiKey);
+
+            if (!CLIENT_ID || CLIENT_ID === 'YOUR_TWITTER_CLIENT_ID') {
+                showSetupInstructions();
+                return;
+            }
+
+            // Generate PKCE parameters
+            const codeVerifier = generateRandomString(128);
+            const codeChallenge = await generateCodeChallenge(codeVerifier);
+            const state = generateRandomString(32);
+
+            // Store PKCE parameters
+            localStorage.setItem('pkce_code_verifier', codeVerifier);
+            localStorage.setItem('oauth_state', state);
+
+            // Build OAuth URL
+            const params = new URLSearchParams({
+                response_type: 'code',
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
+                scope: 'tweet.read tweet.write users.read offline.access',
+                state: state,
+                code_challenge: codeChallenge,
+                code_challenge_method: 'S256'
+            });
+
+            const authUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
+            window.location.href = authUrl;
+        }
+
+        // Handle OAuth callback
+        async function handleOAuthCallback(code, state) {
+            try {
+                const storedState = localStorage.getItem('oauth_state');
+                if (state !== storedState) {
+                    throw new Error('State mismatch - possible CSRF attack');
+                }
+
+                const codeVerifier = localStorage.getItem('pkce_code_verifier');
+                if (!codeVerifier) {
+                    throw new Error('Code verifier not found');
+                }
+
+                // Exchange code for access token
+                const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        grant_type: 'authorization_code',
+                        client_id: CLIENT_ID,
+                        code: code,
+                        redirect_uri: REDIRECT_URI,
+                        code_verifier: codeVerifier
+                    })
+                });
+
+                if (!tokenResponse.ok) {
+                    const errorData = await tokenResponse.text();
+                    throw new Error(`Token exchange failed: ${errorData}`);
+                }
+
+                const tokenData = await tokenResponse.json();
+                accessToken = tokenData.access_token;
+
+                // Store token
+                localStorage.setItem('twitter_access_token', accessToken);
+
+                // Clean up URL and storage
+                window.history.replaceState({}, document.title, window.location.pathname);
+                localStorage.removeItem('pkce_code_verifier');
+                localStorage.removeItem('oauth_state');
+
+                // Show main app
+                showMainApp();
+                await loadUserInfo();
+                await loadMyTweets();
+
+            } catch (error) {
+                console.error('OAuth callback error:', error);
+                showError(`Authentication failed: ${error.message}`);
+                logout();
+            }
+        }
+
+        // Show main application
+        function showMainApp() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'grid';
+        }
+
+        // Load current user info
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('https://api.twitter.com/2/users/me?user.fields=public_metrics,profile_image_url', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load user info: ${response.status}`);
+                }
+
+                const userData = await response.json();
+                currentUser = userData.data;
+
+                // Update UI
+                document.getElementById('userAvatar').src = currentUser.profile_image_url || '';
+                document.getElementById('userName').textContent = currentUser.name;
+                document.getElementById('userHandle').textContent = `@${currentUser.username}`;
+                document.getElementById('followersCount').textContent = currentUser.public_metrics.followers_count.toLocaleString();
+                document.getElementById('followingCount').textContent = currentUser.public_metrics.following_count.toLocaleString();
+                document.getElementById('tweetsCount').textContent = currentUser.public_metrics.tweet_count.toLocaleString();
+
+            } catch (error) {
+                console.error('Error loading user info:', error);
+                showError('Failed to load user information');
+            }
+        }
+
+        // Load user's tweets
+        async function loadMyTweets() {
+            try {
+                const tweetsContainer = document.getElementById('tweetsContainer');
+                tweetsContainer.innerHTML = '<p class="loading">Loading your tweets...</p>';
+
+                const response = await fetch(`https://api.twitter.com/2/users/${currentUser.id}/tweets?max_results=10&tweet.fields=created_at,public_metrics,context_annotations`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load tweets: ${response.status}`);
+                }
+
+                const tweetsData = await response.json();
+                displayTweets(tweetsData.data || []);
+
+            } catch (error) {
+                console.error('Error loading tweets:', error);
+                showError('Failed to load tweets');
+                document.getElementById('tweetsContainer').innerHTML = '<p class="error">Failed to load tweets</p>';
+            }
+        }
+
+        // Display tweets
+        function displayTweets(tweets) {
+            const tweetsContainer = document.getElementById('tweetsContainer');
+            
+            if (!tweets.length) {
+                tweetsContainer.innerHTML = '<p>No tweets found.</p>';
+                return;
+            }
+
+            tweetsContainer.innerHTML = tweets.map(tweet => `
+                <div class="post-item" onclick="selectTweet('${tweet.id}', this)">
+                    <div class="post-content">${tweet.text}</div>
+                    <div class="post-meta">
+                        <span>📅 ${new Date(tweet.created_at).toLocaleString()}</span>
+                        <span>❤️ ${tweet.public_metrics?.like_count || 0}</span>
+                        <span>🔄 ${tweet.public_metrics?.retweet_count || 0}</span>
+                        <span>💬 ${tweet.public_metrics?.reply_count || 0}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Select a tweet and load its replies
+        async function selectTweet(tweetId, element) {
+            // Remove previous selection
+            document.querySelectorAll('.post-item').forEach(item => item.classList.remove('selected'));
+            element.classList.add('selected');
+            
+            selectedTweet = tweetId;
+            await loadReplies(tweetId);
+        }
+
+        // Load replies to a tweet
+        async function loadReplies(tweetId) {
+            try {
+                const commentsContainer = document.getElementById('commentsContainer');
+                const commentsSection = document.getElementById('commentsSection');
+                
+                commentsSection.style.display = 'block';
+                commentsContainer.innerHTML = '<p class="loading">Loading replies...</p>';
+
+                // Search for replies to this tweet
+                const searchQuery = `conversation_id:${tweetId} -from:${currentUser.username}`;
+                const response = await fetch(`https://api.twitter.com/2/tweets/search/recent?query=${encodeURIComponent(searchQuery)}&max_results=10&tweet.fields=created_at,author_id,public_metrics,in_reply_to_user_id&expansions=author_id`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load replies: ${response.status}`);
+                }
+
+                const repliesData = await response.json();
+                displayReplies(repliesData.data || []);
+
+            } catch (error) {
+                console.error('Error loading replies:', error);
+                showError('Failed to load replies');
+                document.getElementById('commentsContainer').innerHTML = '<p class="error">Failed to load replies</p>';
+            }
+        }
+
+        // Display replies
+        function displayReplies(replies) {
+            const commentsContainer = document.getElementById('commentsContainer');
+            
+            if (!replies.length) {
+                commentsContainer.innerHTML = '<p>No replies found for this tweet.</p>';
+                return;
+            }
+
+            commentsContainer.innerHTML = replies.map(reply => `
+                <div class="comment-item" onclick="selectComment('${reply.id}', this, '${reply.text.replace(/'/g, "\\'")}')">
+                    <div class="comment-content">${reply.text}</div>
+                    <div class="comment-meta">
+                        <span>📅 ${new Date(reply.created_at).toLocaleString()}</span>
+                        <span>❤️ ${reply.public_metrics?.like_count || 0}</span>
+                        <span>💬 ${reply.public_metrics?.reply_count || 0}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Select a comment for AI response
+        function selectComment(commentId, element, commentText) {
+            document.querySelectorAll('.comment-item').forEach(item => item.classList.remove('selected'));
+            element.classList.add('selected');
+            
+            selectedComment = {
+                id: commentId,
+                text: commentText
+            };
+            
+            document.getElementById('responseSection').style.display = 'block';
+            generateResponse();
+        }
+
+        // Generate AI response
+        async function generateResponse() {
+            if (!selectedComment) {
+                showError('Please select a comment first');
+                return;
+            }
+
+            if (!deepseekApiKey) {
+                showError('Please configure your Deepseek API key');
+                return;
+            }
+
+            const responseTextarea = document.getElementById('generatedResponse');
+            const instructions = document.getElementById('responseInstructions').value;
+            const style = document.getElementById('responseStyle').value;
+            
+            responseTextarea.value = 'Generating AI response...';
+
+            try {
+                let systemPrompt = instructions;
+                
+                // Add style-specific instructions
+                switch(style) {
+                    case 'professional':
+                        systemPrompt += ' Use a professional and respectful tone.';
+                        break;
+                    case 'casual':
+                        systemPrompt += ' Use a casual and friendly tone with appropriate emojis.';
+                        break;
+                    case 'helpful':
+                        systemPrompt += ' Focus on being helpful and providing useful information.';
+                        break;
+                    case 'engaging':
+                        systemPrompt += ' Ask engaging questions to continue the conversation.';
+                        break;
+                }
+
+                const response = await fetch(DEEPSEEK_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${deepseekApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'deepseek-chat',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: systemPrompt
+                            },
+                            {
+                                role: 'user',
+                                content: `Please respond to this comment: "${selectedComment.text}"`
+                            }
+                        ],
+                        max_tokens: 100,
+                        temperature: 0.7
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`AI API failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const generatedText = data.choices[0].message.content;
+                
+                responseTextarea.value = generatedText;
+                showSuccess('AI response generated successfully!');
+
+            } catch (error) {
+                console.error('Error generating response:', error);
+                showError(`Failed to generate response: ${error.message}`);
+                responseTextarea.value = 'Failed to generate response. Please try again.';
+            }
+        }
+
+        // Publish reply
+        async function publishReply() {
+            if (!selectedComment) {
+                showError('Please select a comment first');
+                return;
+            }
+
+            const responseText = document.getElementById('generatedResponse').value;
+            
+            if (!responseText || responseText === 'Generating AI response...') {
+                showError('Please generate a response first');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to post this reply?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('https://api.twitter.com/2/tweets', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: responseText,
+                        reply: {
+                            in_reply_to_tweet_id: selectedComment.id
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    throw new Error(`Failed to post reply: ${response.status} - ${errorData}`);
+                }
+
+                const data = await response.json();
+                showSuccess('Reply posted successfully!');
+                
+                // Clear the response area
+                document.getElementById('generatedResponse').value = '';
+                document.getElementById('responseSection').style.display = 'none';
+                
+                // Reload replies
+                if (selectedTweet) {
+                    await loadReplies(selectedTweet);
+                }
+
+            } catch (error) {
+                console.error('Error posting reply:', error);
+                showError(`Failed to post reply: ${error.message}`);
+            }
+        }
+
+        // Show analytics (placeholder)
+        function showAnalytics() {
+            alert('Analytics feature coming soon! This will show your engagement stats and AI response performance.');
+        }
+
+        // Logout
+        function logout() {
+            localStorage.removeItem('twitter_access_token');
+            localStorage.removeItem('deepseek_api_key');
+            accessToken = '';
+            currentUser = null;
+            
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'none';
+            
+            // Clear form
+            document.getElementById('deepseekApiKey').value = '';
+        }
+
+        // Show setup instructions
+        function showSetupInstructions() {
+            alert(`Setup Required:
+
+1. Go to https://developer.twitter.com/en/portal/dashboard
+2. Create a new project/app
+3. Get your OAuth 2.0 Client ID
+4. Set the redirect URI to: ${REDIRECT_URI}
+5. Replace 'YOUR_TWITTER_CLIENT_ID' in the code with your actual Client ID
+6. Deploy to GitHub Pages
+
+Then restart the app.`);
+        }
+
+        // Utility functions
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            
+            const container = document.querySelector('.content-area') || document.querySelector('.auth-section');
+            container.insertBefore(errorDiv, container.firstChild);
+            
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            
+            const container = document.querySelector('.content-area') || document.querySelector('.auth-section');
+            container.insertBefore(successDiv, container.firstChild);
+            
+            setTimeout(() => successDiv.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
