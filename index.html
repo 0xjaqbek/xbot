@@ -304,6 +304,9 @@
                 <button onclick="enableCorsProxy()" style="background: #e74c3c; margin: 5px;">
                     🚫 Enable CORS Proxy
                 </button>
+                <button onclick="testProxy()" style="background: #9b59b6; margin: 5px;">
+                    🔧 Test Vercel Proxy
+                </button>
             </div>
         </div>
 
@@ -704,9 +707,21 @@
 
         // Helper function to call Twitter API through Vercel proxy
         async function callTwitterAPI(endpoint, method = 'GET', body = null) {
-            const proxyUrl = `${window.location.origin}/api/twitter-token?action=proxy&endpoint=${encodeURIComponent(endpoint)}`;
+            // Split endpoint and query parameters
+            const [path, queryString] = endpoint.includes('?') ? endpoint.split('?') : [endpoint, ''];
             
-            console.log('🔗 Calling Twitter API through proxy:', endpoint);
+            // Build proxy URL with properly encoded parameters
+            let proxyUrl = `${window.location.origin}/api/twitter-token?action=proxy&endpoint=${encodeURIComponent(path)}`;
+            
+            // Add query parameters if they exist
+            if (queryString) {
+                proxyUrl += `&params=${encodeURIComponent(queryString)}`;
+            }
+            
+            console.log('🔗 Calling Twitter API through proxy:');
+            console.log('  - Path:', path);
+            console.log('  - Query:', queryString);
+            console.log('  - Proxy URL:', proxyUrl);
             
             const response = await fetch(proxyUrl, {
                 method: method,
@@ -717,8 +732,11 @@
                 body: body ? JSON.stringify(body) : undefined
             });
 
+            console.log('📡 Proxy response status:', response.status);
+
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error('❌ Proxy error response:', errorText);
                 throw new Error(`Twitter API call failed: ${response.status} - ${errorText}`);
             }
 
