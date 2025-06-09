@@ -290,6 +290,18 @@
                     Get your free API key at <a href="https://platform.deepseek.com/" target="_blank">platform.deepseek.com</a>
                 </p>
             </div>
+            <div style="margin-top: 30px;">
+                <h3>🔧 Debug Tools</h3>
+                <button onclick="showSetupInstructions()" style="background: #ffc107; color: #000; margin: 5px;">
+                    📋 Setup Instructions
+                </button>
+                <button onclick="checkCurrentUrl()" style="background: #17a2b8; margin: 5px;">
+                    🔍 Check Current URL
+                </button>
+                <button onclick="testRedirect()" style="background: #28a745; margin: 5px;">
+                    🧪 Test Redirect URI
+                </button>
+            </div>
         </div>
 
         <!-- Main Application -->
@@ -369,8 +381,13 @@
 
     <script>
         // Configuration
-        const CLIENT_ID = '1752809316795506688-2EXdfAnFOQJWB6VkA0FuLMYRkJin5a'; // You'll need to set this
+        const CLIENT_ID = 'YOUR_TWITTER_CLIENT_ID'; // You'll need to set this
         const REDIRECT_URI = window.location.origin + window.location.pathname;
+        
+        // Debug info
+        console.log('🔗 Current URL:', window.location.href);
+        console.log('🔗 Redirect URI:', REDIRECT_URI);
+        console.log('🔑 Client ID:', CLIENT_ID);
         const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
         // Global variables
@@ -382,18 +399,40 @@
 
         // Check if user is returning from Twitter OAuth
         window.addEventListener('load', function() {
+            console.log('🔍 Page loaded, checking for OAuth callback...');
+            console.log('🔗 Current URL:', window.location.href);
+            
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
+            const error = urlParams.get('error');
+            const errorDescription = urlParams.get('error_description');
+
+            console.log('📋 URL Parameters:');
+            console.log('  - code:', code ? 'Present' : 'Missing');
+            console.log('  - state:', state ? 'Present' : 'Missing');
+            console.log('  - error:', error);
+            console.log('  - error_description:', errorDescription);
+
+            if (error) {
+                console.error('❌ OAuth Error:', error, errorDescription);
+                showError(`OAuth Error: ${error} - ${errorDescription}`);
+                return;
+            }
 
             if (code && state) {
+                console.log('✅ OAuth callback detected, processing...');
                 handleOAuthCallback(code, state);
             } else {
+                console.log('📍 No OAuth callback, checking for existing token...');
                 // Check if user was previously authenticated
                 accessToken = localStorage.getItem('twitter_access_token');
                 if (accessToken) {
+                    console.log('✅ Found existing access token');
                     showMainApp();
                     loadUserInfo();
+                } else {
+                    console.log('📍 No existing token, showing login page');
                 }
             }
 
@@ -441,6 +480,9 @@
                 return;
             }
 
+            console.log('🚀 Starting Twitter OAuth...');
+            console.log('🔗 Redirect URI that will be used:', REDIRECT_URI);
+
             // Generate PKCE parameters
             const codeVerifier = generateRandomString(128);
             const codeChallenge = await generateCodeChallenge(codeVerifier);
@@ -462,7 +504,14 @@
             });
 
             const authUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
-            window.location.href = authUrl;
+            console.log('🔗 Auth URL:', authUrl);
+            
+            // Add a small delay and user notification
+            showSuccess('Redirecting to Twitter... You should be redirected back here after login.');
+            
+            setTimeout(() => {
+                window.location.href = authUrl;
+            }, 1000);
         }
 
         // Handle OAuth callback
@@ -838,19 +887,115 @@
 
         // Show setup instructions
         function showSetupInstructions() {
-            alert(`Setup Required:
+            const currentUrl = window.location.href;
+            const redirectUri = REDIRECT_URI;
+            
+            const instructions = `🔧 TWITTER APP SETUP REQUIRED:
 
-1. Go to https://developer.twitter.com/en/portal/dashboard
-2. Create a new project/app
-3. Get your OAuth 2.0 Client ID
-4. Set the redirect URI to: ${REDIRECT_URI}
-5. Replace 'YOUR_TWITTER_CLIENT_ID' in the code with your actual Client ID
-6. Deploy to GitHub Pages
+📍 IMPORTANT: Your redirect URI must be EXACTLY:
+${redirectUri}
 
-Then restart the app.`);
+🏃‍♂️ QUICK SETUP STEPS:
+
+1️⃣ Go to: https://developer.twitter.com/en/portal/dashboard
+
+2️⃣ Create new app (if you don't have one):
+   - Click "Create App"
+   - Fill in basic info
+   - Click "Next"
+
+3️⃣ Configure OAuth 2.0:
+   - Go to your app settings
+   - Click "App permissions" → Set to "Read and write"
+   - Click "Keys and tokens"
+   - Find "OAuth 2.0 Client ID" section
+   - Copy your Client ID
+
+4️⃣ Set Redirect URI:
+   - Still in app settings
+   - Click "App settings" 
+   - Scroll to "Callback / Redirect URIs"
+   - Add EXACTLY: ${redirectUri}
+   - Save changes
+
+5️⃣ Update this code:
+   - Replace 'YOUR_TWITTER_CLIENT_ID' with your actual Client ID
+   - Redeploy to GitHub Pages
+
+❌ COMMON MISTAKES:
+- Redirect URI doesn't match exactly (case-sensitive!)
+- App permissions not set to "Read and write"
+- Using wrong Client ID (use OAuth 2.0, not API key)
+- Forgetting the trailing slash in redirect URI
+
+🔍 DEBUGGING:
+- Check browser console for error messages
+- Make sure redirect URI in Twitter app matches exactly: ${redirectUri}
+- Ensure OAuth 2.0 is enabled (not OAuth 1.0a)`;
+
+            console.log(instructions);
+            
+            // Show in modal
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.8); z-index: 10000; 
+                display: flex; align-items: center; justify-content: center; padding: 20px;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white; padding: 30px; border-radius: 15px; 
+                max-width: 700px; max-height: 80%; overflow-y: auto;
+                font-family: monospace; white-space: pre-line; font-size: 13px;
+            `;
+            content.textContent = instructions;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'Close & Check Console';
+            closeBtn.style.cssText = 'margin-top: 20px; padding: 10px 20px; background: #1da1f2; color: white; border: none; border-radius: 5px; cursor: pointer;';
+            closeBtn.onclick = () => modal.remove();
+            
+            content.appendChild(closeBtn);
+            modal.appendChild(content);
+            document.body.appendChild(modal);
         }
 
-        // Utility functions
+        // Debug functions
+        function checkCurrentUrl() {
+            const info = `🔍 CURRENT URL DEBUG INFO:
+
+🌐 Full URL: ${window.location.href}
+🏠 Origin: ${window.location.origin}
+📄 Pathname: ${window.location.pathname}
+🔗 Redirect URI: ${REDIRECT_URI}
+
+📋 URL Parameters:
+${window.location.search ? window.location.search : 'None'}
+
+✅ This is what should be set in your Twitter app as the redirect URI:
+${REDIRECT_URI}
+
+💡 Make sure it matches EXACTLY in your Twitter app settings!`;
+
+            console.log(info);
+            alert(info);
+        }
+
+        function testRedirect() {
+            if (!CLIENT_ID || CLIENT_ID === 'YOUR_TWITTER_CLIENT_ID') {
+                alert('⚠️ Please set your CLIENT_ID first!\n\nReplace YOUR_TWITTER_CLIENT_ID in the code with your actual Twitter OAuth 2.0 Client ID.');
+                return;
+            }
+
+            const testUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=tweet.read&state=test123&code_challenge=test&code_challenge_method=S256`;
+            
+            console.log('🧪 Test URL:', testUrl);
+            
+            if (confirm(`🧪 TEST REDIRECT URI\n\nThis will open Twitter OAuth with your settings.\nYou should be redirected back here after login.\n\nCurrent redirect URI: ${REDIRECT_URI}\n\nContinue?`)) {
+                window.open(testUrl, '_blank');
+            }
+        }
         function showError(message) {
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error';
