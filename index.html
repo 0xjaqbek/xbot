@@ -305,7 +305,7 @@
                     🚫 Enable CORS Proxy
                 </button>
                 <button onclick="testProxy()" style="background: #9b59b6; margin: 5px;">
-                    🔧 Test Vercel Proxy
+                    🔧 Test API Endpoints
                 </button>
             </div>
         </div>
@@ -705,50 +705,24 @@
             document.getElementById('mainContent').style.display = 'grid';
         }
 
-        // Helper function to call Twitter API through Vercel proxy
-        async function callTwitterAPI(endpoint, method = 'GET', body = null) {
-            // Split endpoint and query parameters
-            const [path, queryString] = endpoint.includes('?') ? endpoint.split('?') : [endpoint, ''];
-            
-            // Build proxy URL with properly encoded parameters
-            let proxyUrl = `${window.location.origin}/api/twitter-token?action=proxy&endpoint=${encodeURIComponent(path)}`;
-            
-            // Add query parameters if they exist
-            if (queryString) {
-                proxyUrl += `&params=${encodeURIComponent(queryString)}`;
-            }
-            
-            console.log('🔗 Calling Twitter API through proxy:');
-            console.log('  - Path:', path);
-            console.log('  - Query:', queryString);
-            console.log('  - Proxy URL:', proxyUrl);
-            
-            const response = await fetch(proxyUrl, {
-                method: method,
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: body ? JSON.stringify(body) : undefined
-            });
-
-            console.log('📡 Proxy response status:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Proxy error response:', errorText);
-                throw new Error(`Twitter API call failed: ${response.status} - ${errorText}`);
-            }
-
-            return await response.json();
-        }
-
         // Load current user info
         async function loadUserInfo() {
             try {
-                console.log('👤 Loading user info through proxy...');
+                console.log('👤 Loading user info...');
                 
-                const userData = await callTwitterAPI('users/me?user.fields=public_metrics,profile_image_url');
+                const response = await fetch('/api/user-info', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`User info request failed: ${response.status} - ${errorText}`);
+                }
+
+                const userData = await response.json();
                 currentUser = userData.data;
 
                 console.log('✅ User data loaded:', currentUser);
@@ -844,11 +818,21 @@
                 commentsSection.style.display = 'block';
                 commentsContainer.innerHTML = '<p class="loading">Loading replies...</p>';
 
-                console.log('💬 Loading replies through proxy...');
+                console.log('💬 Loading replies...');
 
-                // Search for replies to this tweet
-                const searchQuery = `conversation_id:${tweetId} -from:${currentUser.username}`;
-                const repliesData = await callTwitterAPI(`tweets/search/recent?query=${encodeURIComponent(searchQuery)}&max_results=10&tweet.fields=created_at,author_id,public_metrics,in_reply_to_user_id&expansions=author_id`);
+                const response = await fetch(`/api/tweet-replies?tweetId=${tweetId}&username=${currentUser.username}`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Replies request failed: ${response.status} - ${errorText}`);
+                }
+
+                const repliesData = await response.json();
 
                 console.log('✅ Replies data loaded:', repliesData);
                 displayReplies(repliesData.data || []);
@@ -991,16 +975,26 @@
             }
 
             try {
-                console.log('📤 Publishing reply through proxy...');
+                console.log('📤 Publishing reply...');
                 
-                const requestBody = {
-                    text: responseText,
-                    reply: {
-                        in_reply_to_tweet_id: selectedComment.id
-                    }
-                };
+                const response = await fetch('/api/post-tweet', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: responseText,
+                        replyToTweetId: selectedComment.id
+                    })
+                });
 
-                const data = await callTwitterAPI('tweets', 'POST', requestBody);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Post reply failed: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
                 
                 console.log('✅ Reply published:', data);
                 showSuccess('Reply posted successfully!');
