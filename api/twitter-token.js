@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
 // Handle Twitter API proxying
 async function handleTwitterAPIProxy(req, res) {
-  const { endpoint } = req.query;
+  const { endpoint, params } = req.query;
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -47,8 +47,16 @@ async function handleTwitterAPIProxy(req, res) {
 
   try {
     // Construct Twitter API URL
-    const twitterUrl = `https://api.twitter.com/2/${endpoint}`;
+    let twitterUrl = `https://api.twitter.com/2/${endpoint}`;
+    
+    // Add query parameters if they exist
+    if (params) {
+      twitterUrl += `?${params}`;
+    }
+    
     console.log('🔗 Proxying to:', twitterUrl);
+    console.log('📡 Method:', req.method);
+    console.log('🔐 Auth header present:', !!authHeader);
 
     // Forward the request to Twitter API
     const twitterResponse = await fetch(twitterUrl, {
@@ -62,6 +70,7 @@ async function handleTwitterAPIProxy(req, res) {
 
     const responseText = await twitterResponse.text();
     console.log('📡 Twitter API response status:', twitterResponse.status);
+    console.log('📄 Response length:', responseText.length);
 
     // Return the response
     res.status(twitterResponse.status);
@@ -69,7 +78,8 @@ async function handleTwitterAPIProxy(req, res) {
     try {
       const jsonData = JSON.parse(responseText);
       res.json(jsonData);
-    } catch {
+    } catch (parseError) {
+      console.log('⚠️ Response is not JSON, returning as text');
       res.send(responseText);
     }
 
@@ -77,7 +87,8 @@ async function handleTwitterAPIProxy(req, res) {
     console.error('❌ Twitter API proxy error:', error);
     res.status(500).json({ 
       error: 'Twitter API proxy failed',
-      message: error.message
+      message: error.message,
+      details: 'Check Vercel function logs for more information'
     });
   }
 }
