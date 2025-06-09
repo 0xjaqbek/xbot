@@ -301,8 +301,8 @@
                 <button onclick="testRedirect()" style="background: #28a745; margin: 5px;">
                     🧪 Test Redirect URI
                 </button>
-                <button onclick="enableCorsAccess()" style="background: #dc3545; margin: 5px;">
-                    🔓 Enable CORS Access
+                <button onclick="enableCorsProxy()" style="background: #e74c3c; margin: 5px;">
+                    🚫 Enable CORS Proxy
                 </button>
             </div>
         </div>
@@ -386,11 +386,14 @@
         // Configuration
         const CLIENT_ID = 'cGVLOGZSRERpNVhwM0JlUmxJaTE6MTpjaQ';
         const REDIRECT_URI = window.location.origin + window.location.pathname;
+        const USE_VERCEL_FUNCTION = false; // Set to true if you deploy to Vercel
+        const VERCEL_FUNCTION_URL = '/api/twitter-token'; // Your Vercel function URL
         
         // Debug info
         console.log('🔗 Current URL:', window.location.href);
         console.log('🔗 Redirect URI:', REDIRECT_URI);
         console.log('🔑 Client ID:', CLIENT_ID);
+        console.log('⚡ Use Vercel Function:', USE_VERCEL_FUNCTION);
         const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
         // Global variables
@@ -517,7 +520,7 @@
             }, 1000);
         }
 
-        // Handle OAuth callback with multiple CORS proxy fallbacks
+        // Handle OAuth callback
         async function handleOAuthCallback(code, state) {
             try {
                 const storedState = localStorage.getItem('oauth_state');
@@ -530,96 +533,48 @@
                     throw new Error('Code verifier not found');
                 }
 
-                console.log('🔄 Exchanging authorization code for access token...');
+                console.log('🔄 Attempting token exchange...');
 
-                const TOKEN_URL = 'https://api.twitter.com/2/oauth2/token';
-                const requestBody = new URLSearchParams({
-                    grant_type: 'authorization_code',
-                    client_id: CLIENT_ID,
-                    code: code,
-                    redirect_uri: REDIRECT_URI,
-                    code_verifier: codeVerifier
-                });
-
-                // Try multiple CORS proxies in order
-                const CORS_PROXIES = [
-                    'https://cors-anywhere.herokuapp.com/',
-                    'https://api.allorigins.win/raw?url=',
-                    'https://corsproxy.io/?',
-                ];
-
-                let tokenResponse = null;
-                let lastError = null;
-
-                // First try direct request (in case CORS is disabled in browser)
-                try {
-                    console.log('🧪 Trying direct request...');
-                    tokenResponse = await fetch(TOKEN_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: requestBody
-                    });
-                    console.log('✅ Direct request worked!');
-                } catch (directError) {
-                    console.log('❌ Direct request failed, trying CORS proxies...');
-                    
-                    // Try each CORS proxy
-                    for (const proxy of CORS_PROXIES) {
-                        try {
-                            console.log(`🧪 Trying proxy: ${proxy}`);
-                            
-                            let proxyUrl;
-                            let headers = {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                            };
-
-                            if (proxy.includes('allorigins')) {
-                                proxyUrl = proxy + encodeURIComponent(TOKEN_URL);
-                                // AllOrigins requires different approach
-                                const response = await fetch(proxyUrl, {
-                                    method: 'POST',
-                                    headers: headers,
-                                    body: requestBody
-                                });
-                                tokenResponse = response;
-                            } else {
-                                proxyUrl = proxy + TOKEN_URL;
-                                if (proxy.includes('cors-anywhere')) {
-                                    headers['X-Requested-With'] = 'XMLHttpRequest';
-                                }
-                                tokenResponse = await fetch(proxyUrl, {
-                                    method: 'POST',
-                                    headers: headers,
-                                    body: requestBody
-                                });
-                            }
-                            
-                            console.log(`✅ Proxy ${proxy} worked! Status:`, tokenResponse.status);
-                            break;
-                            
-                        } catch (proxyError) {
-                            console.log(`❌ Proxy ${proxy} failed:`, proxyError.message);
-                            lastError = proxyError;
-                            continue;
-                        }
-                    }
-                }
-
-                if (!tokenResponse || !tokenResponse.ok) {
-                    if (tokenResponse) {
-                        const errorData = await tokenResponse.text();
-                        console.error('❌ Token exchange error:', errorData);
-                        throw new Error(`Token exchange failed: ${errorData}`);
-                    } else {
-                        throw lastError || new Error('All CORS proxies failed');
-                    }
-                }
-
-                const tokenData = await tokenResponse.json();
-                console.log('✅ Token exchange successful');
+                // Try multiple token exchange methods
+                let tokenData = null;
                 
+                // Method 1: Try Vercel function if available
+                if (USE_VERCEL_FUNCTION) {
+                    try {
+                        console.log('🚀 Trying Vercel function...');
+                        tokenData = await exchangeTokenWithVercel(code, codeVerifier);
+                    } catch (error) {
+                        console.log('❌ Vercel function failed:', error.message);
+                    }
+                }
+                
+                // Method 2: Try direct request (will likely fail due to CORS)
+                if (!tokenData) {
+                    try {
+                        console.log('🧪 Trying direct token exchange...');
+                        tokenData = await exchangeTokenDirect(code, codeVerifier);
+                    } catch (error) {
+                        console.log('❌ Direct exchange failed (expected):', error.message);
+                    }
+                }
+
+                // Method 3: Try with CORS proxy (backup)
+                if (!tokenData) {
+                    try {
+                        console.log('🧪 Trying CORS proxy...');
+                        tokenData = await exchangeTokenWithProxy(code, codeVerifier);
+                    } catch (error) {
+                        console.log('❌ CORS proxy failed:', error.message);
+                    }
+                }
+
+                // Method 4: Show manual token setup if automated methods fail
+                if (!tokenData) {
+                    console.log('⚠️ Automated token exchange failed, showing manual setup...');
+                    showManualTokenSetup(code, codeVerifier);
+                    return;
+                }
+
                 accessToken = tokenData.access_token;
 
                 // Store token
@@ -630,29 +585,103 @@
                 localStorage.removeItem('pkce_code_verifier');
                 localStorage.removeItem('oauth_state');
 
-                // Show success message
-                showSuccess('🎉 Successfully logged in with Twitter!');
-
                 // Show main app
                 showMainApp();
                 await loadUserInfo();
                 await loadMyTweets();
 
             } catch (error) {
-                console.error('❌ OAuth callback error:', error);
+                console.error('OAuth callback error:', error);
+                showError(`Authentication failed: ${error.message}`);
                 
-                if (error.message.includes('Failed to fetch') || error.message.includes('CORS') || error.message.includes('proxies failed')) {
-                    // Specific handling for CORS errors
-                    showCorsErrorHelp();
-                } else {
-                    showError(`Authentication failed: ${error.message}`);
+                // If it's a fetch error, provide specific help
+                if (error.message.includes('Failed to fetch')) {
+                    showCorsHelp();
                 }
                 
-                // Don't logout on CORS error, just show help
-                if (!error.message.includes('Failed to fetch') && !error.message.includes('CORS') && !error.message.includes('proxies failed')) {
-                    logout();
-                }
+                logout();
             }
+        }
+
+        // Token exchange with Vercel function
+        async function exchangeTokenWithVercel(code, codeVerifier) {
+            const functionUrl = VERCEL_FUNCTION_URL.startsWith('http') ? 
+                VERCEL_FUNCTION_URL : 
+                window.location.origin + VERCEL_FUNCTION_URL;
+                
+            console.log('📡 Calling Vercel function:', functionUrl);
+            
+            const response = await fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    code: code,
+                    codeVerifier: codeVerifier,
+                    clientId: CLIENT_ID,
+                    redirectUri: REDIRECT_URI
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Vercel function failed: ${errorData}`);
+            }
+
+            return await response.json();
+        }
+
+        // Direct token exchange (will likely fail due to CORS)
+        async function exchangeTokenDirect(code, codeVerifier) {
+            const response = await fetch('https://api.twitter.com/2/oauth2/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    client_id: CLIENT_ID,
+                    code: code,
+                    redirect_uri: REDIRECT_URI,
+                    code_verifier: codeVerifier
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Token exchange failed: ${errorData}`);
+            }
+
+            return await response.json();
+        }
+
+        // Token exchange with CORS proxy
+        async function exchangeTokenWithProxy(code, codeVerifier) {
+            const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+            const tokenUrl = 'https://api.twitter.com/2/oauth2/token';
+            
+            const response = await fetch(proxyUrl + tokenUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    client_id: CLIENT_ID,
+                    code: code,
+                    redirect_uri: REDIRECT_URI,
+                    code_verifier: codeVerifier
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Proxy token exchange failed: ${errorData}`);
+            }
+
+            return await response.json();
         }
 
         // Show main application
@@ -1046,87 +1075,221 @@ ${redirectUri}
             document.body.appendChild(modal);
         }
 
-        // Show CORS error help
-        function showCorsErrorHelp() {
-            const helpText = `🚨 CORS ERROR DETECTED!
-
-The token exchange failed due to CORS (Cross-Origin Resource Sharing) restrictions.
-This is a security feature of browsers when calling APIs from static websites.
-
-🔧 SOLUTIONS TO TRY:
-
-1️⃣ ENABLE CORS-ANYWHERE ACCESS (QUICK FIX):
-   • Visit: https://cors-anywhere.herokuapp.com/corsdemo
-   • Click "Request temporary access"
-   • Return here and try login again
-
-2️⃣ USE BROWSER EXTENSION:
-   • Install "CORS Unblock" extension
-   • Enable it for this page
-   • Try login again
-
-3️⃣ USE CHROME WITH DISABLED SECURITY:
-   • Close all Chrome windows
-   • Run: chrome --disable-web-security --user-data-dir="/tmp/chrome_dev"
-   • Open your app in that Chrome window
-
-4️⃣ PRODUCTION SOLUTION:
-   • Deploy a simple backend server for token exchange
-   • Use Vercel/Netlify serverless functions
-   • This handles CORS properly
-
-🔗 The OAuth redirect worked perfectly! 
-You just need to solve the CORS issue for token exchange.
-
-Try solution #1 first - it's the quickest!`;
-
-            console.log(helpText);
-            
-            // Show modal with solutions
+        // Show CORS help
+        function showCorsHelp() {
             const modal = document.createElement('div');
             modal.style.cssText = `
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                background: rgba(0,0,0,0.9); z-index: 10000; 
+                background: rgba(0,0,0,0.8); z-index: 10000; 
                 display: flex; align-items: center; justify-content: center; padding: 20px;
             `;
             
             const content = document.createElement('div');
             content.style.cssText = `
                 background: white; padding: 30px; border-radius: 15px; 
-                max-width: 600px; max-height: 80%; overflow-y: auto;
-                font-family: monospace; white-space: pre-line; font-size: 12px;
+                max-width: 700px; max-height: 80%; overflow-y: auto;
+                font-family: Arial; line-height: 1.6;
             `;
-            content.textContent = helpText;
             
-            const buttonContainer = document.createElement('div');
-            buttonContainer.style.cssText = 'margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;';
+            content.innerHTML = `
+                <h2 style="color: #1da1f2; margin-bottom: 20px;">🚫 CORS Issue Detected</h2>
+                
+                <p><strong>What happened:</strong> Your OAuth login worked, but the token exchange is blocked by CORS policy. This is normal for client-side apps.</p>
+                
+                <h3 style="margin: 20px 0 10px 0;">🔧 Solutions (Choose One):</h3>
+                
+                <div style="border: 2px solid #28a745; padding: 15px; margin: 15px 0; border-radius: 10px;">
+                    <h4 style="color: #28a745;">✅ SOLUTION 1: Deploy with Vercel (Recommended)</h4>
+                    <p>Vercel provides serverless functions that can handle the token exchange:</p>
+                    <ol>
+                        <li>Push your code to GitHub</li>
+                        <li>Connect your repo to <a href="https://vercel.com" target="_blank">Vercel.com</a></li>
+                        <li>Add the serverless function (I'll provide the code)</li>
+                        <li>Update your redirect URI to the Vercel URL</li>
+                        <li>Set USE_VERCEL_FUNCTION = true in your code</li>
+                    </ol>
+                    <button onclick="showVercelInstructions()" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-top: 10px;">
+                        📋 Show Vercel Setup Guide
+                    </button>
+                </div>
+                
+                <div style="border: 2px solid #ffc107; padding: 15px; margin: 15px 0; border-radius: 10px;">
+                    <h4 style="color: #e0a800;">⚡ SOLUTION 2: Use Browser Extension</h4>
+                    <p>Install a CORS extension temporarily:</p>
+                    <ol>
+                        <li>Install "CORS Unblock" extension</li>
+                        <li>Enable it for your GitHub Pages site</li>
+                        <li>Refresh the page and try login again</li>
+                    </ol>
+                </div>
+                
+                <div style="border: 2px solid #17a2b8; padding: 15px; margin: 15px 0; border-radius: 10px;">
+                    <h4 style="color: #17a2b8;">🔧 SOLUTION 3: Manual Token Setup</h4>
+                    <p>Get the token manually and paste it in:</p>
+                    <button onclick="showManualTokenInstructions()" style="background: #17a2b8; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                        Show Manual Instructions
+                    </button>
+                </div>
+                
+                <button onclick="this.closest('div').remove()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px;">
+                    Close
+                </button>
+            `;
             
-            const corsBtn = document.createElement('button');
-            corsBtn.textContent = '🔗 Open CORS-Anywhere';
-            corsBtn.style.cssText = 'padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;';
-            corsBtn.onclick = () => {
-                window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank');
-                showSuccess('CORS-Anywhere opened. Click "Request temporary access" then return here.');
-            };
-            
-            const extensionBtn = document.createElement('button');
-            extensionBtn.textContent = '🔧 Get Extension';
-            extensionBtn.style.cssText = 'padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;';
-            extensionBtn.onclick = () => {
-                window.open('https://chrome.google.com/webstore/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino', '_blank');
-            };
-            
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = 'Close';
-            closeBtn.style.cssText = 'padding: 10px 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;';
-            closeBtn.onclick = () => modal.remove();
-            
-            buttonContainer.appendChild(corsBtn);
-            buttonContainer.appendChild(extensionBtn);
-            buttonContainer.appendChild(closeBtn);
-            content.appendChild(buttonContainer);
             modal.appendChild(content);
             document.body.appendChild(modal);
+        }
+
+        // Show manual token setup
+        function showManualTokenSetup(code, codeVerifier) {
+            console.log('📋 Manual token setup data:');
+            console.log('Code:', code);
+            console.log('Code Verifier:', codeVerifier);
+            console.log('Client ID:', CLIENT_ID);
+            console.log('Redirect URI:', REDIRECT_URI);
+            
+            showCorsHelp();
+        }
+
+        // Show manual token instructions
+        function showManualTokenInstructions() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const codeVerifier = localStorage.getItem('pkce_code_verifier');
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.9); z-index: 11000; 
+                display: flex; align-items: center; justify-content: center; padding: 20px;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white; padding: 30px; border-radius: 15px; 
+                max-width: 800px; max-height: 90%; overflow-y: auto;
+                font-family: monospace; font-size: 12px;
+            `;
+            
+            content.innerHTML = `
+                <h2>🔧 Manual Token Exchange</h2>
+                <p>Use this curl command to get your access token:</p>
+                
+                <textarea readonly style="width: 100%; height: 150px; margin: 10px 0; padding: 10px; border: 1px solid #ccc;">curl -X POST https://api.twitter.com/2/oauth2/token \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "grant_type=authorization_code" \\
+  -d "client_id=${CLIENT_ID}" \\
+  -d "code=${code}" \\
+  -d "redirect_uri=${encodeURIComponent(REDIRECT_URI)}" \\
+  -d "code_verifier=${codeVerifier}"</textarea>
+  
+                <p><strong>Steps:</strong></p>
+                <ol>
+                    <li>Copy the curl command above</li>
+                    <li>Run it in terminal/command prompt</li>
+                    <li>Copy the "access_token" from the response</li>
+                    <li>Paste it in the input below:</li>
+                </ol>
+                
+                <input type="text" id="manualToken" placeholder="Paste access token here..." style="width: 100%; padding: 10px; margin: 10px 0;">
+                
+                <div style="margin: 20px 0;">
+                    <button onclick="useManualToken()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                        Use This Token
+                    </button>
+                    <button onclick="this.closest('div').remove()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                        Cancel
+                    </button>
+                </div>
+            `;
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+        }
+
+        // Show Vercel instructions
+        function showVercelInstructions() {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.9); z-index: 12000; 
+                display: flex; align-items: center; justify-content: center; padding: 20px;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white; padding: 30px; border-radius: 15px; 
+                max-width: 800px; max-height: 90%; overflow-y: auto;
+                font-family: Arial; line-height: 1.6;
+            `;
+            
+            content.innerHTML = `
+                <h2 style="color: #28a745; margin-bottom: 20px;">🚀 Vercel Deployment Guide</h2>
+                
+                <h3>📁 Files You Need:</h3>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                    <strong>1. api/twitter-token.js</strong> - The serverless function<br>
+                    <strong>2. index.html</strong> - Your current HTML file<br>
+                    <strong>3. Update configuration in HTML</strong>
+                </div>
+                
+                <h3>🔧 Steps:</h3>
+                <ol style="margin-left: 20px;">
+                    <li><strong>Create api folder</strong> in your GitHub repository</li>
+                    <li><strong>Add twitter-token.js</strong> file with the serverless function code</li>
+                    <li><strong>Update your HTML</strong>: Set <code>USE_VERCEL_FUNCTION = true</code></li>
+                    <li><strong>Go to <a href="https://vercel.com" target="_blank">vercel.com</a></strong> and sign up with GitHub</li>
+                    <li><strong>Import your repository</strong> and deploy</li>
+                    <li><strong>Update Twitter app</strong> redirect URI to Vercel URL</li>
+                </ol>
+                
+                <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                    <strong>💡 Result:</strong> Your app will work perfectly with no CORS issues!
+                </div>
+                
+                <div style="margin: 20px 0;">
+                    <button onclick="window.open('https://github.com/new', '_blank')" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                        📁 Create GitHub Repo
+                    </button>
+                    <button onclick="window.open('https://vercel.com', '_blank')" style="background: #000; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                        🚀 Open Vercel
+                    </button>
+                    <button onclick="this.closest('div').remove()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                        Close
+                    </button>
+                </div>
+                
+                <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                    <strong>📋 Need the serverless function code?</strong><br>
+                    Check the "Vercel Serverless Function" artifact I created above.
+                </div>
+            `;
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+        }
+
+        // Use manual token
+        function useManualToken() {
+            const token = document.getElementById('manualToken').value.trim();
+            if (!token) {
+                alert('Please paste your access token');
+                return;
+            }
+            
+            accessToken = token;
+            localStorage.setItem('twitter_access_token', accessToken);
+            
+            // Clean up
+            document.querySelectorAll('div[style*="position: fixed"]').forEach(modal => modal.remove());
+            window.history.replaceState({}, document.title, window.location.pathname);
+            localStorage.removeItem('pkce_code_verifier');
+            localStorage.removeItem('oauth_state');
+            
+            // Show main app
+            showMainApp();
+            loadUserInfo();
+            loadMyTweets();
         }
         function checkCurrentUrl() {
             const info = `🔍 CURRENT URL DEBUG INFO:
@@ -1162,53 +1325,6 @@ ${REDIRECT_URI}
                 window.open(testUrl, '_blank');
             }
         }
-            const instructions = `🔓 ENABLE CORS ACCESS FOR TOKEN EXCHANGE
-
-The OAuth redirect works, but token exchange fails due to CORS.
-Here are your options:
-
-🚀 OPTION 1 - CORS-ANYWHERE (RECOMMENDED):
-1. Visit: https://cors-anywhere.herokuapp.com/corsdemo
-2. Click "Request temporary access to the demo server"
-3. Wait for approval message
-4. Return here and try login again
-
-🔧 OPTION 2 - BROWSER EXTENSION:
-1. Install "CORS Unblock" extension:
-   https://chrome.google.com/webstore/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino
-2. Enable it for this page
-3. Try login again
-
-💻 OPTION 3 - CHROME FLAGS:
-1. Close ALL Chrome windows
-2. Run Chrome with: --disable-web-security --user-data-dir="/tmp/chrome_dev"
-3. Open your app in that special Chrome window
-
-🏗️ OPTION 4 - PRODUCTION SOLUTION:
-Deploy a simple backend for token exchange (recommended for real use)
-
-Choose one option and try the login again!`;
-
-            console.log(instructions);
-            
-            if (confirm('🔓 Open CORS-Anywhere access page?\n\nThis will open the page where you can request temporary access to solve the CORS issue.')) {
-                window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank');
-                showSuccess('🔗 CORS-Anywhere opened! Click "Request temporary access" and return here.');
-            }
-        
-            if (!CLIENT_ID || CLIENT_ID === 'YOUR_TWITTER_CLIENT_ID') {
-                alert('⚠️ Please set your CLIENT_ID first!\n\nReplace YOUR_TWITTER_CLIENT_ID in the code with your actual Twitter OAuth 2.0 Client ID.');
-                return;
-            }
-
-            const testUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=tweet.read&state=test123&code_challenge=test&code_challenge_method=S256`;
-            
-            console.log('🧪 Test URL:', testUrl);
-            
-            if (confirm(`🧪 TEST REDIRECT URI\n\nThis will open Twitter OAuth with your settings.\nYou should be redirected back here after login.\n\nCurrent redirect URI: ${REDIRECT_URI}\n\nContinue?`)) {
-                window.open(testUrl, '_blank');
-            }
-        
         function showError(message) {
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error';
