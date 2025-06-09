@@ -1,4 +1,4 @@
-// api/user-tweets.js - Get user's tweets
+// api/user-tweets.js - Get user's tweets with rate limit handling
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -43,6 +43,17 @@ export default async function handler(req, res) {
     if (response.ok) {
       console.log('✅ Tweets fetched successfully');
       res.status(200).json(JSON.parse(data));
+    } else if (response.status === 429) {
+      // Rate limit hit
+      console.log('⏰ Rate limit hit for tweets API');
+      const retryAfter = response.headers.get('x-rate-limit-reset');
+      
+      res.status(429).json({ 
+        error: 'Rate limit exceeded', 
+        message: 'Twitter API rate limit reached. Please wait a few minutes and try again.',
+        retryAfter: retryAfter,
+        suggestion: 'This is normal during testing. Rate limits reset every 15 minutes.'
+      });
     } else {
       console.error('❌ Twitter API error:', data);
       res.status(response.status).json({ error: 'Twitter API error', details: data });
