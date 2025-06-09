@@ -747,7 +747,8 @@
                 const tweetsContainer = document.getElementById('tweetsContainer');
                 tweetsContainer.innerHTML = '<p class="loading">Loading your tweets...</p>';
 
-                const response = await fetch(`https://api.twitter.com/2/users/${currentUser.id}/tweets?max_results=10&tweet.fields=created_at,public_metrics,context_annotations`, {
+                // Use the serverless function instead of direct API call
+                const response = await fetch(`/api/user-tweets?userId=${currentUser.id}`, {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
                         'Content-Type': 'application/json'
@@ -799,7 +800,7 @@
                 tweetsContainer.innerHTML = '<p class="error">Failed to load tweets</p>';
             }
         }
-
+        
         // Display tweets
         function displayTweets(tweets) {
             const tweetsContainer = document.getElementById('tweetsContainer');
