@@ -301,6 +301,9 @@
                 <button onclick="testRedirect()" style="background: #28a745; margin: 5px;">
                     🧪 Test Redirect URI
                 </button>
+                <button onclick="enableCorsAccess()" style="background: #dc3545; margin: 5px;">
+                    🔓 Enable CORS Access
+                </button>
             </div>
         </div>
 
@@ -381,7 +384,7 @@
 
     <script>
         // Configuration
-        const CLIENT_ID = 'cGVLOGZSRERpNVhwM0JlUmxJaTE6MTpjaQ'; // You'll need to set this
+        const CLIENT_ID = 'cGVLOGZSRERpNVhwM0JlUmxJaTE6MTpjaQ';
         const REDIRECT_URI = window.location.origin + window.location.pathname;
         
         // Debug info
@@ -514,7 +517,7 @@
             }, 1000);
         }
 
-        // Handle OAuth callback
+        // Handle OAuth callback with multiple CORS proxy fallbacks
         async function handleOAuthCallback(code, state) {
             try {
                 const storedState = localStorage.getItem('oauth_state');
@@ -527,27 +530,96 @@
                     throw new Error('Code verifier not found');
                 }
 
-                // Exchange code for access token
-                const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: new URLSearchParams({
-                        grant_type: 'authorization_code',
-                        client_id: CLIENT_ID,
-                        code: code,
-                        redirect_uri: REDIRECT_URI,
-                        code_verifier: codeVerifier
-                    })
+                console.log('🔄 Exchanging authorization code for access token...');
+
+                const TOKEN_URL = 'https://api.twitter.com/2/oauth2/token';
+                const requestBody = new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    client_id: CLIENT_ID,
+                    code: code,
+                    redirect_uri: REDIRECT_URI,
+                    code_verifier: codeVerifier
                 });
 
-                if (!tokenResponse.ok) {
-                    const errorData = await tokenResponse.text();
-                    throw new Error(`Token exchange failed: ${errorData}`);
+                // Try multiple CORS proxies in order
+                const CORS_PROXIES = [
+                    'https://cors-anywhere.herokuapp.com/',
+                    'https://api.allorigins.win/raw?url=',
+                    'https://corsproxy.io/?',
+                ];
+
+                let tokenResponse = null;
+                let lastError = null;
+
+                // First try direct request (in case CORS is disabled in browser)
+                try {
+                    console.log('🧪 Trying direct request...');
+                    tokenResponse = await fetch(TOKEN_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: requestBody
+                    });
+                    console.log('✅ Direct request worked!');
+                } catch (directError) {
+                    console.log('❌ Direct request failed, trying CORS proxies...');
+                    
+                    // Try each CORS proxy
+                    for (const proxy of CORS_PROXIES) {
+                        try {
+                            console.log(`🧪 Trying proxy: ${proxy}`);
+                            
+                            let proxyUrl;
+                            let headers = {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            };
+
+                            if (proxy.includes('allorigins')) {
+                                proxyUrl = proxy + encodeURIComponent(TOKEN_URL);
+                                // AllOrigins requires different approach
+                                const response = await fetch(proxyUrl, {
+                                    method: 'POST',
+                                    headers: headers,
+                                    body: requestBody
+                                });
+                                tokenResponse = response;
+                            } else {
+                                proxyUrl = proxy + TOKEN_URL;
+                                if (proxy.includes('cors-anywhere')) {
+                                    headers['X-Requested-With'] = 'XMLHttpRequest';
+                                }
+                                tokenResponse = await fetch(proxyUrl, {
+                                    method: 'POST',
+                                    headers: headers,
+                                    body: requestBody
+                                });
+                            }
+                            
+                            console.log(`✅ Proxy ${proxy} worked! Status:`, tokenResponse.status);
+                            break;
+                            
+                        } catch (proxyError) {
+                            console.log(`❌ Proxy ${proxy} failed:`, proxyError.message);
+                            lastError = proxyError;
+                            continue;
+                        }
+                    }
+                }
+
+                if (!tokenResponse || !tokenResponse.ok) {
+                    if (tokenResponse) {
+                        const errorData = await tokenResponse.text();
+                        console.error('❌ Token exchange error:', errorData);
+                        throw new Error(`Token exchange failed: ${errorData}`);
+                    } else {
+                        throw lastError || new Error('All CORS proxies failed');
+                    }
                 }
 
                 const tokenData = await tokenResponse.json();
+                console.log('✅ Token exchange successful');
+                
                 accessToken = tokenData.access_token;
 
                 // Store token
@@ -558,15 +630,28 @@
                 localStorage.removeItem('pkce_code_verifier');
                 localStorage.removeItem('oauth_state');
 
+                // Show success message
+                showSuccess('🎉 Successfully logged in with Twitter!');
+
                 // Show main app
                 showMainApp();
                 await loadUserInfo();
                 await loadMyTweets();
 
             } catch (error) {
-                console.error('OAuth callback error:', error);
-                showError(`Authentication failed: ${error.message}`);
-                logout();
+                console.error('❌ OAuth callback error:', error);
+                
+                if (error.message.includes('Failed to fetch') || error.message.includes('CORS') || error.message.includes('proxies failed')) {
+                    // Specific handling for CORS errors
+                    showCorsErrorHelp();
+                } else {
+                    showError(`Authentication failed: ${error.message}`);
+                }
+                
+                // Don't logout on CORS error, just show help
+                if (!error.message.includes('Failed to fetch') && !error.message.includes('CORS') && !error.message.includes('proxies failed')) {
+                    logout();
+                }
             }
         }
 
@@ -961,7 +1046,88 @@ ${redirectUri}
             document.body.appendChild(modal);
         }
 
-        // Debug functions
+        // Show CORS error help
+        function showCorsErrorHelp() {
+            const helpText = `🚨 CORS ERROR DETECTED!
+
+The token exchange failed due to CORS (Cross-Origin Resource Sharing) restrictions.
+This is a security feature of browsers when calling APIs from static websites.
+
+🔧 SOLUTIONS TO TRY:
+
+1️⃣ ENABLE CORS-ANYWHERE ACCESS (QUICK FIX):
+   • Visit: https://cors-anywhere.herokuapp.com/corsdemo
+   • Click "Request temporary access"
+   • Return here and try login again
+
+2️⃣ USE BROWSER EXTENSION:
+   • Install "CORS Unblock" extension
+   • Enable it for this page
+   • Try login again
+
+3️⃣ USE CHROME WITH DISABLED SECURITY:
+   • Close all Chrome windows
+   • Run: chrome --disable-web-security --user-data-dir="/tmp/chrome_dev"
+   • Open your app in that Chrome window
+
+4️⃣ PRODUCTION SOLUTION:
+   • Deploy a simple backend server for token exchange
+   • Use Vercel/Netlify serverless functions
+   • This handles CORS properly
+
+🔗 The OAuth redirect worked perfectly! 
+You just need to solve the CORS issue for token exchange.
+
+Try solution #1 first - it's the quickest!`;
+
+            console.log(helpText);
+            
+            // Show modal with solutions
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.9); z-index: 10000; 
+                display: flex; align-items: center; justify-content: center; padding: 20px;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white; padding: 30px; border-radius: 15px; 
+                max-width: 600px; max-height: 80%; overflow-y: auto;
+                font-family: monospace; white-space: pre-line; font-size: 12px;
+            `;
+            content.textContent = helpText;
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;';
+            
+            const corsBtn = document.createElement('button');
+            corsBtn.textContent = '🔗 Open CORS-Anywhere';
+            corsBtn.style.cssText = 'padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;';
+            corsBtn.onclick = () => {
+                window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank');
+                showSuccess('CORS-Anywhere opened. Click "Request temporary access" then return here.');
+            };
+            
+            const extensionBtn = document.createElement('button');
+            extensionBtn.textContent = '🔧 Get Extension';
+            extensionBtn.style.cssText = 'padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;';
+            extensionBtn.onclick = () => {
+                window.open('https://chrome.google.com/webstore/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino', '_blank');
+            };
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'Close';
+            closeBtn.style.cssText = 'padding: 10px 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;';
+            closeBtn.onclick = () => modal.remove();
+            
+            buttonContainer.appendChild(corsBtn);
+            buttonContainer.appendChild(extensionBtn);
+            buttonContainer.appendChild(closeBtn);
+            content.appendChild(buttonContainer);
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+        }
         function checkCurrentUrl() {
             const info = `🔍 CURRENT URL DEBUG INFO:
 
@@ -996,6 +1162,53 @@ ${REDIRECT_URI}
                 window.open(testUrl, '_blank');
             }
         }
+            const instructions = `🔓 ENABLE CORS ACCESS FOR TOKEN EXCHANGE
+
+The OAuth redirect works, but token exchange fails due to CORS.
+Here are your options:
+
+🚀 OPTION 1 - CORS-ANYWHERE (RECOMMENDED):
+1. Visit: https://cors-anywhere.herokuapp.com/corsdemo
+2. Click "Request temporary access to the demo server"
+3. Wait for approval message
+4. Return here and try login again
+
+🔧 OPTION 2 - BROWSER EXTENSION:
+1. Install "CORS Unblock" extension:
+   https://chrome.google.com/webstore/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino
+2. Enable it for this page
+3. Try login again
+
+💻 OPTION 3 - CHROME FLAGS:
+1. Close ALL Chrome windows
+2. Run Chrome with: --disable-web-security --user-data-dir="/tmp/chrome_dev"
+3. Open your app in that special Chrome window
+
+🏗️ OPTION 4 - PRODUCTION SOLUTION:
+Deploy a simple backend for token exchange (recommended for real use)
+
+Choose one option and try the login again!`;
+
+            console.log(instructions);
+            
+            if (confirm('🔓 Open CORS-Anywhere access page?\n\nThis will open the page where you can request temporary access to solve the CORS issue.')) {
+                window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank');
+                showSuccess('🔗 CORS-Anywhere opened! Click "Request temporary access" and return here.');
+            }
+        
+            if (!CLIENT_ID || CLIENT_ID === 'YOUR_TWITTER_CLIENT_ID') {
+                alert('⚠️ Please set your CLIENT_ID first!\n\nReplace YOUR_TWITTER_CLIENT_ID in the code with your actual Twitter OAuth 2.0 Client ID.');
+                return;
+            }
+
+            const testUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=tweet.read&state=test123&code_challenge=test&code_challenge_method=S256`;
+            
+            console.log('🧪 Test URL:', testUrl);
+            
+            if (confirm(`🧪 TEST REDIRECT URI\n\nThis will open Twitter OAuth with your settings.\nYou should be redirected back here after login.\n\nCurrent redirect URI: ${REDIRECT_URI}\n\nContinue?`)) {
+                window.open(testUrl, '_blank');
+            }
+        
         function showError(message) {
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error';
