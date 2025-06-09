@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitter Auto-Reply Bot Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+        }
+
+        .top-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .activity-feed {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            height: 500px;
+            overflow-y: auto;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #667eea;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .status-offline {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .status-online {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .status-processing {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .metric {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+        }
+
+        .metric-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .activity-mention { background: #3b82f6; }
+        .activity-reply { background: #10b981; }
+        .activity-error { background: #ef4444; }
+        .activity-info { background: #6b7280; }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-title {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .activity-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .activity-time {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .settings-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .settings-section h3 {
+            color: #374151;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .pending-reply {
+            background: #fff7ed;
+            border: 2px solid #fb923c;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .pending-reply-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .pending-reply-text {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        .pending-reply-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .pending-reply-actions button {
+            flex: 1;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .approve-btn {
+            background: #10b981;
+            color: white;
+        }
+
+        .reject-btn {
+            background: #ef4444;
+            color: white;
+        }
+
+        .edit-btn {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: black;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1001;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.error {
+            background: #ef4444;
+        }
+
+        .notification.warning {
+            background: #f59e0b;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                gap: 15px;
+                padding: 15px;
+            }
+
+            .sidebar {
+                position: static;
+            }
+
+            .top-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="sidebar">
+            <div class="logo">
+                <h1>🤖 TwitterBot</h1>
+                <p>Auto-Reply Dashboard</p>
+            </div>
+
+            <div id="statusIndicator" class="status-indicator status-offline">
+                <div class="status-dot"></div>
+                <span>Bot Offline</span>
+            </div>
+
+            <div class="settings-section">
+                <h3>⚙️ Bot Controls</h3>
+                <button id="startBot" class="btn">🚀 Start Bot</button>
+                <button id="stopBot" class="btn btn-danger" disabled>⏹️ Stop Bot</button>
+                <button id="testReply" class="btn btn-secondary">🧪 Test Reply</button>
+            </div>
+
+            <div class="settings-section">
+                <h3>🔧 Settings</h3>
+                <div class="form-group">
+                    <label>Check Interval (minutes)</label>
+                    <select id="checkInterval">
+                        <option value="1">1 minute</option>
+                        <option value="2">2 minutes</option>
+                        <option value="5" selected>5 minutes</option>
+                        <option value="10">10 minutes</option>
+                        <option value="15">15 minutes</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Auto-Post Replies</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autoPost">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <button id="saveSettings" class="btn btn-success">💾 Save Settings</button>
+            </div>
+
+            <div class="settings-section">
+                <h3>🔑 Account</h3>
+                <button id="loginModal" class="btn">🔐 Login to Twitter</button>
+                <button id="configureAI" class="btn btn-secondary">🤖 Configure AI</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="top-cards">
+                <div class="card">
+                    <div class="metric">
+                        <span id="mentionsCount" class="metric-value">0</span>
+                        <div class="metric-label">Mentions Today</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="metric">
+                        <span id="repliesCount" class="metric-value">0</span>
+                        <div class="metric-label">Replies Sent</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="metric">
+                        <span id="lastCheck" class="metric-value">Never</span>
+                        <div class="metric-label">Last Check</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="metric">
+                        <span id="uptime" class="metric-value">0:00</span>
+                        <div class="metric-label">Uptime</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="activity-feed">
+                <h2 style="margin-bottom: 20px; color: #374151;">📱 Live Activity Feed</h2>
+                <div id="activityList">
+                    <div class="activity-item">
+                        <div class="activity-icon activity-info">ℹ️</div>
+                        <div class="activity-content">
+                            <div class="activity-title">Bot Dashboard Loaded</div>
+                            <div class="activity-text">Ready to start monitoring Twitter activity</div>
+                            <div class="activity-time">Just now</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModalDialog" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 style="margin-bottom: 20px;">🔐 Twitter Login</h2>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="twitterUsername" placeholder="your-username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="twitterPassword" placeholder="your-password">
+            </div>
+            <div class="form-group">
+                <label>Deepseek API Key (Optional)</label>
+                <input type="text" id="deepseekApiKey" placeholder="sk-your-api-key">
+                <small>Get your free API key at <a href="https://platform.deepseek.com/" target="_blank">platform.deepseek.com</a></small>
+            </div>
+            <button id="saveLogin" class="btn">💾 Save & Login</button>
+        </div>
+    </div>
+
+    <!-- Test Reply Modal -->
+    <div id="testReplyModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 style="margin-bottom: 20px;">🧪 Test AI Reply</h2>
+            <div class="form-group">
+                <label>Original Tweet</label>
+                <textarea id="originalTweet" rows="3" placeholder="Enter the original tweet..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Comment/Mention</label>
+                <textarea id="commentText" rows="3" placeholder="Enter the comment to reply to..."></textarea>
+            </div>
+            <button id="generateTestReply" class="btn">🤖 Generate Reply</button>
+            <div id="testReplyResult" style="margin-top: 15px; display: none;">
+                <label>Generated Reply:</label>
+                <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-top: 5px;" id="generatedReply"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Replies Section -->
+    <div id="pendingReplies" style="display: none;">
+        <h3>⏳ Pending Replies</h3>
+        <div id="pendingRepliesList"></div>
+    </div>
+
+    <script>
+        // Global state
+        let botState = {
+            isRunning: false,
+            startTime: null,
+            stats: {
+                mentions: 0,
+                replies: 0,
+                lastCheck: null
+            },
+            settings: {
+                interval: 5,
+                autoPost: false
+            },
+            credentials: {
+                username: '',
+                password: '',
+                apiKey: ''
+            }
+        };
+
+        // DOM elements
+        const statusIndicator = document.getElementById('statusIndicator');
+        const startBtn = document.getElementById('startBot');
+        const stopBtn = document.getElementById('stopBot');
+        const activityList = document.getElementById('activityList');
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            updateUI();
+            startUptimeCounter();
+
+            // Event listeners
+            startBtn.addEventListener('click', startBot);
+            stopBtn.addEventListener('click', stopBot);
+            document.getElementById('testReply').addEventListener('click', openTestReplyModal);
+            document.getElementById('loginModal').addEventListener('click', openLoginModal);
+            document.getElementById('saveSettings').addEventListener('click', saveSettings);
+            document.getElementById('saveLogin').addEventListener('click', saveLogin);
+            document.getElementById('generateTestReply').addEventListener('click', generateTestReply);
+
+            // Modal controls
+            document.querySelectorAll('.close').forEach(closeBtn => {
+                closeBtn.addEventListener('click', function() {
+                    this.closest('.modal').style.display = 'none';
+                });
+            });
+
+            // Auto-post toggle
+            document.getElementById('autoPost').addEventListener('change', function() {
+                botState.settings.autoPost = this.checked;
+                addActivity('settings', '⚙️ Auto-post ' + (this.checked ? 'enabled' : 'disabled'));
+            });
+        });
+
+        function startBot() {
+            if (!botState.credentials.username || !botState.credentials.password) {
+                showNotification('Please configure your Twitter login first', 'error');
+                openLoginModal();
+                return;
+            }
+
+            botState.isRunning = true;
+            botState.startTime = new Date();
+            updateBotStatus('online', 'Bot Running');
+            
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+
+            addActivity('info', '🚀 Bot started successfully');
+            showNotification('Bot started! Monitoring mentions and replies...', 'success');
+
+            // Start monitoring loop
+            startMonitoringLoop();
+        }
+
+        function stopBot() {
+            botState.isRunning = false;
+            updateBotStatus('offline', 'Bot Offline');
+            
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+
+            addActivity('info', '⏹️ Bot stopped');
+            showNotification('Bot stopped', 'warning');
+        }
+
+        function startMonitoringLoop() {
+            if (!botState.isRunning) return;
+
+            updateBotStatus('processing', 'Checking Activity...');
+            
+            // Simulate checking for mentions
+            setTimeout(() => {
+                if (!botState.isRunning) return;
+
+                // Simulate finding mentions/replies
+                const activities = [
+                    { type: 'mention', text: 'Found new mention from @user123', detail: 'Love your automation tutorial!' },
+                    { type: 'reply', text: 'New reply on your tweet', detail: 'This is so helpful, thanks!' },
+                    { type: 'mention', text: 'Mention about AI tools', detail: '@you What tools do you recommend for automation?' }
+                ];
+
+                if (Math.random() > 0.3) { // 70% chance of activity
+                    const activity = activities[Math.floor(Math.random() * activities.length)];
+                    
+                    if (activity.type === 'mention') {
+                        botState.stats.mentions++;
+                        addActivity('mention', activity.text, activity.detail);
+                        
+                        // Generate AI reply
+                        generateAIReply(activity.detail).then(reply => {
+                            if (botState.settings.autoPost) {
+                                // Auto-post the reply
+                                setTimeout(() => {
+                                    botState.stats.replies++;
+                                    addActivity('reply', `Posted reply: "${reply}"`);
+                                    updateStats();
+                                }, 2000);
+                            } else {
+                                // Show pending reply
+                                showPendingReply(activity.detail, reply);
+                            }
+                        });
+                    }
+                }
+
+                botState.stats.lastCheck = new Date();
+                updateBotStatus('online', 'Bot Running');
+                updateStats();
+
+                // Schedule next check
+                const interval = botState.settings.interval * 60 * 1000;
+                setTimeout(startMonitoringLoop, interval);
+
+            }, 3000 + Math.random() * 2000); // 3-5 second delay
+        }
+
+        function updateBotStatus(status, text) {
+            statusIndicator.className = `status-indicator status-${status}`;
+            statusIndicator.querySelector('span').textContent = text;
+        }
+
+        function addActivity(type, title, detail = '') {
+            const icons = {
+                mention: '💬',
+                reply: '✅',
+                error: '❌',
+                info: 'ℹ️',
+                settings: '⚙️'
+            };
+
+            const activityItem = document.createElement('div');
+            activityItem.className = 'activity-item';
+            activityItem.innerHTML = `
+                <div class="activity-icon activity-${type}">${icons[type]}</div>
+                <div class="activity-content">
+                    <div class="activity-title">${title}</div>
+                    ${detail ? `<div class="activity-text">${detail}</div>` : ''}
+                    <div class="activity-time">${new Date().toLocaleTimeString()}</div>
+                </div>
+            `;
+
+            activityList.insertBefore(activityItem, activityList.firstChild);
+
+            // Keep only last 20 activities
+            while (activityList.children.length > 20) {
+                activityList.removeChild(activityList.lastChild);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('mentionsCount').textContent = botState.stats.mentions;
+            document.getElementById('repliesCount').textContent = botState.stats.replies;
+            document.getElementById('lastCheck').textContent = 
+                botState.stats.lastCheck ? botState.stats.lastCheck.toLocaleTimeString() : 'Never';
+        }
+
+        function startUptimeCounter() {
+            setInterval(() => {
+                if (botState.isRunning && botState.startTime) {
+                    const uptime = new Date() - botState.startTime;
+                    const hours = Math.floor(uptime / (1000 * 60 * 60));
+                    const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
+                    document.getElementById('uptime').textContent = `${hours}:${minutes.toString().padStart(2, '0')}`;
+                } else {
+                    document.getElementById('uptime').textContent = '0:00';
+                }
+            }, 1000);
+        }
+
+        function openLoginModal() {
+            document.getElementById('loginModalDialog').style.display = 'block';
+            
+            // Pre-fill with saved values
+            document.getElementById('twitterUsername').value = botState.credentials.username;
+            document.getElementById('deepseekApiKey').value = botState.credentials.apiKey;
+        }
+
+        function openTestReplyModal() {
+            document.getElementById('testReplyModal').style.display = 'block';
+            document.getElementById('testReplyResult').style.display = 'none';
+        }
+
+        function saveLogin() {
+            const username = document.getElementById('twitterUsername').value;
+            const password = document.getElementById('twitterPassword').value;
+            const apiKey = document.getElementById('deepseekApiKey').value;
+
+            if (!username || !password) {
+                showNotification('Please enter both username and password', 'error');
+                return;
+            }
+
+            botState.credentials = { username, password, apiKey };
+            localStorage.setItem('botCredentials', JSON.stringify(botState.credentials));
+            
+            document.getElementById('loginModalDialog').style.display = 'none';
+            showNotification('Credentials saved successfully!', 'success');
+            addActivity('settings', '🔐 Login credentials updated');
+        }
+
+        function saveSettings() {
+            botState.settings.interval = parseInt(document.getElementById('checkInterval').value);
+            localStorage.setItem('botSettings', JSON.stringify(botState.settings));
+            
+            showNotification('Settings saved!', 'success');
+            addActivity('settings', `⚙️ Check interval set to ${botState.settings.interval} minutes`);
+        }
+
+        function loadSettings() {
+            const savedCredentials = localStorage.getItem('botCredentials');
+            const savedSettings = localStorage.getItem('botSettings');
+
+            if (savedCredentials) {
+                botState.credentials = JSON.parse(savedCredentials);
+            }
+
+            if (savedSettings) {
+                botState.settings = { ...botState.settings, ...JSON.parse(savedSettings) };
+                document.getElementById('checkInterval').value = botState.settings.interval;
+                document.getElementById('autoPost').checked = botState.settings.autoPost;
+            }
+        }
+
+        function updateUI() {
+            updateStats();
+        }
+
+        async function generateAIReply(text) {
+            // Simulate AI reply generation
+            const replies = [
+                "Thanks for your comment! 😊",
+                "That's a great point! What's your experience with this?",
+                "Absolutely! Have you tried implementing something similar?",
+                "Interesting perspective! I'd love to hear more about your approach.",
+                "Great question! The key is to start small and iterate."
+            ];
+            
+            // Add some delay to simulate API call
+            await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+            
+            return replies[Math.floor(Math.random() * replies.length)];
+        }
+
+        function generateTestReply() {
+            const originalTweet = document.getElementById('originalTweet').value;
+            const commentText = document.getElementById('commentText').value;
+
+            if (!commentText.trim()) {
+                showNotification('Please enter a comment to generate a reply for', 'error');
+                return;
+            }
+
+            document.getElementById('generateTestReply').disabled = true;
+            document.getElementById('generateTestReply').textContent = '🤖 Generating...';
+
+            generateAIReply(commentText).then(reply => {
+                document.getElementById('generatedReply').textContent = reply;
+                document.getElementById('testReplyResult').style.display = 'block';
+                
+                document.getElementById('generateTestReply').disabled = false;
+                document.getElementById('generateTestReply').textContent = '🤖 Generate Reply';
+            });
+        }
+
+        function showPendingReply(originalText, reply) {
+            // This would show a pending reply for manual approval
+            addActivity('mention', 'Generated reply pending approval', `Original: "${originalText}" → Reply: "${reply}"`);
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 3000);
+        }
+
+        // Window click event to close modals
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

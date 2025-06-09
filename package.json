@@ -1,0 +1,26 @@
+{
+  "name": "twitter-bot-dashboard",
+  "version": "1.0.0",
+  "description": "Web dashboard for Twitter auto-reply bot",
+  "main": "bot-server.js",
+  "scripts": {
+    "start": "node bot-server.js",
+    "dev": "nodemon bot-server.js",
+    "install-browsers": "npx playwright install chromium",
+    "setup": "npm install && npm run install-browsers",
+    "test-bot": "node twitter-bot-2fa.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.40.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": ["twitter", "bot", "automation", "dashboard", "ai"],
+  "author": "Your Name",
+  "license": "MIT"
+}
