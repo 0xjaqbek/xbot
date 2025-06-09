@@ -741,33 +741,49 @@
             }
         }
 
-        // Load user's tweets
-        async function loadMyTweets() {
-            try {
-                const tweetsContainer = document.getElementById('tweetsContainer');
-                tweetsContainer.innerHTML = '<p class="loading">Loading your tweets...</p>';
-
-                const response = await fetch(`https://api.twitter.com/2/users/${currentUser.id}/tweets?max_results=10&tweet.fields=created_at,public_metrics,context_annotations`, {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Failed to load tweets: ${response.status}`);
-                }
-
-                const tweetsData = await response.json();
-                displayTweets(tweetsData.data || []);
-
-            } catch (error) {
-                console.error('Error loading tweets:', error);
-                showError('Failed to load tweets');
-                document.getElementById('tweetsContainer').innerHTML = '<p class="error">Failed to load tweets</p>';
-            }
+// Load user's tweets
+async function loadMyTweets() {
+    try {
+        if (!currentUser) {
+            console.log('⚠️ Current user not loaded yet, waiting...');
+            await loadUserInfo();
         }
 
+        if (!currentUser) {
+            throw new Error('Failed to load user information');
+        }
+
+        const tweetsContainer = document.getElementById('tweetsContainer');
+        tweetsContainer.innerHTML = '<p class="loading">Loading your tweets...</p>';
+
+        console.log('📝 Loading tweets for user ID:', currentUser.id);
+        
+        const response = await fetch(`/api/user-tweets?userId=${currentUser.id}`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('📡 Tweets response status:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Tweets API error:', errorText);
+            throw new Error(`Tweets request failed: ${response.status} - ${errorText}`);
+        }
+
+        const tweetsData = await response.json();
+        
+        console.log('✅ Tweets data loaded:', tweetsData);
+        displayTweets(tweetsData.data || []);
+
+    } catch (error) {
+        console.error('Error loading tweets:', error);
+        showError('Failed to load tweets: ' + error.message);
+        document.getElementById('tweetsContainer').innerHTML = '<p class="error">Failed to load tweets</p>';
+    }
+}
         // Display tweets
         function displayTweets(tweets) {
             const tweetsContainer = document.getElementById('tweetsContainer');
